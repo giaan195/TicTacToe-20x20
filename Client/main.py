@@ -4,12 +4,19 @@ from tkinter import messagebox
 from model.chessboard import *
 from model.player import *
 
+
 ServerAddress = ('20.205.207.247', 888)
 bufferSize = 100
 UDPClientSocket = socket.socket(family=socket.AF_INET, type = socket.SOCK_DGRAM)
 
+inteval, selectRoom, yourID = None, -1, -1
+roomStatus, roomSign = '00000', ['#d9d9d9', '#ffe033', '#FF4500']
+
 def on_closing():
     """ xử lý khi close app"""
+    global window, inteval
+    
+    if inteval != None: inteval.cancel()
     UDPClientSocket.sendto(str.encode('Exit'), ServerAddress)
     window.destroy()
 
@@ -150,6 +157,7 @@ tk.Button(signFrame, font='Helvetica 14 bold', bg = '#1ea7aa', fg = '#fff', text
 
 def ReceiveThread():
     """Xử lý thông điệp nhận từ server"""
+    global window, inteval, selectRoom, yourID
 
     while True:
         bytesAddressPair = UDPClientSocket.recvfrom(bufferSize)
@@ -211,6 +219,9 @@ def ReceiveThread():
                 chessBoard.clear(csv)
                 yourPlayer.unReady()
 
+                if inteval != None: inteval.cancel()
+                yourPlayer.resetTime()
+
         elif 'Ready' in recvMsg:
             if yourID == int(recvMsg[5]): yourPlayer.ready()
             elif 1 - yourID == int(recvMsg[5]) : enemyPlayer.ready()
@@ -219,8 +230,11 @@ def ReceiveThread():
                 enemyPlayer.ready()
                 yourPlayer.setTurn(yourID == 0)
                 enemyPlayer.setTurn(yourID == 1)
+                
+                reduceTime(yourPlayer if yourID == 0 else enemyPlayer)
 
         elif 'LeaveRoomSuccess' in recvMsg:
+            if inteval != None: inteval.cancel()
             playFrame.destroy()
             signFrame.grid(row=0, column=0, sticky='WE')
 
@@ -229,6 +243,10 @@ def ReceiveThread():
             chessBoard.setCell(csv, int(recvMsg[5:7]), int(recvMsg[7:9]), currentTurn)
             yourPlayer.setTurn(yourID != currentTurn)
             enemyPlayer.setTurn(yourID == currentTurn)
+
+            if inteval != None: inteval.cancel()
+            reduceTime(yourPlayer if yourID != currentTurn else enemyPlayer)
+
 
         elif 'EndGame' in recvMsg:
             mark = json.loads(recvMsg[8:])
@@ -243,11 +261,23 @@ def ReceiveThread():
             yourPlayer.unReady()
             enemyPlayer.unReady()
 
+            if inteval != None: inteval.cancel()
+            yourPlayer.resetTime()
+            enemyPlayer.resetTime()
+
 thread = threading.Thread(target=ReceiveThread, args=())
 thread.start()
 
 window.columnconfigure(0, weight=1)
 window.rowconfigure(0, weight=1)
+
+def reduceTime(yourPlauer):
+    global inteval
+    def func_wrapper():
+        reduceTime(yourPlauer)
+        yourPlauer.reduceTime()
+    inteval = threading.Timer(1, func_wrapper)
+    inteval.start()
 
 window.protocol("WM_DELETE_WINDOW", on_closing)
 window.mainloop()
