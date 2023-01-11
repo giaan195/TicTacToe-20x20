@@ -1,3 +1,5 @@
+import threading
+
 class square:
     """ Tạo đối tượng ô cờ, input là toạn độ đầu x,y và chiều dài cạnh e """
 
@@ -25,3 +27,7 @@ class square:
         elif player == 1:
             csv.create_line(self.x + margin, self.y + margin, self.x + self.e - margin, self.y + self.e - margin, fill = '#56c786', width = 4)
             csv.create_line(self.x  + self.e - margin, self.y + margin, self.x + margin, self.y + self.e - margin, fill = '#56c786', width = 4)
+
+        csv.itemconfig(self.cell, fill = '#A9A9A9')
+        t = threading.Timer(1, lambda: csv.itemconfig(self.cell, fill = "#f0f0f0"))
+        t.start()
